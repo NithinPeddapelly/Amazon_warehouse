@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Job {
+  id           String   @id @default(cuid())
+  sourceJobId  String
+  title        String
+  location     String
+  salary       String?
+  salaryPerHour Float?
+  hoursPerWeek Float?
+  schedule     String?
+  employmentType String?
+  startDate    String?
+  workType     String
+  source       String
+  link         String
+  detectedAt   DateTime @default(now())
+
+  @@unique([source, sourceJobId])
+  @@index([detectedAt])
+}
+
+model JobLog {
+  id             String   @id @default(cuid())
+  source         String
+  jobId          String?
+  fetchedCount   Int?
+  filteredCount  Int?
+  newCount       Int?
+  duplicateCount Int?
+  sentToTelegram Boolean  @default(false)
+  status         String
+  errorMessage   String?
+  detectedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([detectedAt])
+  @@index([jobId])
+}
+
+model UserFilter {
+  id                String   @id @default(cuid())
+  telegramId        String   @unique
+  keywords          String
+  preferredLocation String
+  minSalary         Float?
+  workTypes         String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}

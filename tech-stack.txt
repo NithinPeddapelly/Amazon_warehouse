@@ -1,0 +1,290 @@
+ScotJob Pulse AI — Technical Stack
+Document
+Architecture Philosophy
+Goals:
+●​
+●​
+●​
+●​
+●​
+●​
+
+Fast development
+Low cost (£0–10/month initially)
+Scalable later
+Real-time notifications
+Easy maintenance
+Expandable to multiple job sources
+
+Frontend
+MVP:
+No frontend required initially.
+Future dashboard:
+Layer
+
+Technology
+
+Purpose
+
+Framework
+
+Next.js
+
+Dashboard
+
+UI
+
+Tailwind CSS
+
+Styling
+
+Component
+s
+
+shadcn/ui
+
+UI components
+
+Charts
+
+Chart.js
+
+Analytics
+
+Backend
+
+Layer
+
+Technolog
+y
+
+Purpose
+
+Runtime
+
+Node.js
+
+Server runtime
+
+Framework
+
+Express.js
+
+API/server
+
+Language
+
+TypeScript
+
+Type safety
+
+Reason:
+●​ Fast development
+●​ Huge package ecosystem
+●​ Works well with scraping libraries
+
+Scraping Layer
+Tool
+
+Purpose
+
+Playwright
+
+Dynamic
+pages
+
+Axios
+
+HTTP requests
+
+Cheerio
+
+HTML parsing
+
+Strategy:
+
+Fast path
+Axios
+↓
+Cheerio
+
+Use for static pages
+
+Dynamic path
+Playwright
+
+Use when JavaScript rendering is required
+
+Scheduling Layer
+Tool
+
+Purpose
+
+node-cron Job
+scheduling
+Example:
+cron.schedule("*/10 * * * * *",checkJobs)
+
+Runs every 10 seconds.
+
+Notification Layer
+Tool
+Telegram Bot API
+
+Purpose
+Send
+alerts
+
+Bot creation:
+BotFather
+↓
+BOT_TOKEN
+↓
+Environment Variables
+
+Database Layer
+Development:
+
+Tool
+SQLite
+
+Purpose
+Local
+database
+
+Production:
+Tool
+
+Purpose
+
+PostgreSQ
+L
+
+Main DB
+
+Tables:
+Users
+Jobs
+JobLogs
+Filters
+
+ORM Layer
+Tool
+Prism
+a
+
+Purpose
+Database
+ORM
+
+Benefits:
+●​ Auto migrations
+●​ Type safety
+●​ Easier queries
+
+Caching Layer
+Tool
+
+Purpose
+
+Redi
+s
+
+Temporary memory
+
+Use:
+●​ Store recent IDs
+●​ Prevent duplicates
+●​ Request throttling
+
+Monitoring + Logging
+Tool
+
+Purpose
+
+Winston
+
+Logging
+
+Sentry
+
+Error tracking
+
+Logs:
+[10:00:03]
+Amazon fetch started
+[10:00:04]
+3 jobs detected
+[10:00:04]
+Scotland filter passed
+[10:00:05]
+Telegram notification sent
+
+Deployment Stack
+
+Development:
+Local machine
+
+Production:
+Tool
+
+Purpose
+
+Docker
+
+Containerization
+
+Railway
+
+Hosting
+
+Render
+
+Alternative hosting
+
+Environment Variables
+BOT_TOKEN=xxxxxxxxx
+CHAT_ID=xxxxxxxxx
+DATABASE_URL=postgres://....
+REDIS_URL=xxxx
+SCRAPE_INTERVAL=10
+NODE_ENV=production
+
+Final System Diagram
+Amazon Jobs
+Indeed
+LinkedIn
+Company Pages
+↓
+Playwright/Axios
+↓
+
+Scraper Service
+↓
+Scotland Filter
+↓
+Deduplication Service
+↓
+Redis Cache
+↓
+PostgreSQL
+↓
+Telegram Bot API
+↓
+Phone Notification
+
+MVP Recommendation
+For v1 specifically:
+Node.js
+TypeScript
+Express
+Playwright
+PostgreSQL
+Prisma
+Telegram Bot API
+Railway
+
+This keeps your first version simple, cheap, and strong enough for portfolio use while allowing
+expansion later.
+
+

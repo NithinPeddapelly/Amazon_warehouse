@@ -1,0 +1,462 @@
+Product Requirements Document (PRD)
+Product Name
+ScotJob Pulse AI​
+Real-Time Scotland Job Monitoring + Telegram Alert System
+Version: MVP v1​
+Owner: Nithin Peddapelly​
+Status: Draft
+
+1. Product Vision
+Build a personal job-monitoring platform that continuously monitors Amazon Jobs and future job
+sources, detects new jobs before public Telegram repost channels, filters only relevant Scotland
+jobs, and immediately sends alerts to Telegram.
+Telegram acts only as a delivery mechanism.
+The scraper and monitoring engine perform the actual work.
+
+2. Problem Statement
+Current methods create delays:
+●​ Telegram channels repost jobs after detection delay
+●​ Users manually refresh websites
+●​ Warehouse jobs disappear quickly
+●​ Users receive irrelevant jobs from all over the UK
+●​ Fast-moving listings often fill before users discover them
+Goal:
+Enable the user to receive Scotland job alerts before public channels.
+
+3. Goals
+Primary Goals
+●​ Detect jobs faster than Telegram repost channels
+●​ Only send Scotland jobs
+●​ Prevent duplicate alerts
+●​ Filter based on user preferences
+●​ Support near real-time monitoring
+
+Secondary Goals
+●​ Expand to more job sources
+●​ Add AI ranking
+●​ Add dashboard and analytics
+
+4. User Persona
+Primary User
+International student / part-time worker
+Needs:
+●​ Fast warehouse jobs
+●​ Part-time jobs
+●​ Scotland locations only
+●​ Immediate notifications
+●​ Low manual effort
+
+5. User Stories
+Detection
+As a user
+I want new jobs detected immediately
+So I can apply before positions disappear.
+
+Scotland filtering
+As a user
+I only want Scotland jobs
+So I avoid irrelevant UK listings.
+
+Preferences
+As a user
+I want filtering by keywords and work type
+So I only see jobs I care about.
+
+Notifications
+
+As a user
+I want Telegram alerts instantly
+So I can apply immediately.
+
+6. Functional Requirements
+FR-1 Job Monitoring Engine
+Initial source:
+●​ Amazon Jobs
+Future sources:
+●​ Indeed
+●​ LinkedIn
+●​ Reed
+●​ Company career pages
+●​ Tesco
+●​ NHS
+●​ Sainsbury
+Requirements:
+●​ Poll at configurable intervals
+●​ Respect rate limits
+●​ Store monitoring logs
+●​ Retry on failures
+Input:
+sourceURL
+region
+pollingInterval
+Output:
+job listings
+
+FR-2 Detection Engine
+Requirements:
+
+●​ Fetch jobs
+●​ Extract metadata
+●​ Compare against database
+●​ Detect unseen jobs only
+Logic:
+fetchJobs()
+for(job of jobs){
+if(job.id not in database){
+saveJob()
+sendAlert()
+}
+}
+
+FR-3 Scotland Filter Layer
+The system must only send Scotland jobs.
+Primary detection:
+location.includes("scotland")
+Secondary fallback:
+City matching.
+Supported Scotland cities/areas:
+const scotlandLocations=[
+"bathgate",
+"dunfermline",
+"motherwell",
+"baillieston",
+
+"aberdeen",
+"edinburgh",
+"livingston",
+"glasgow",
+"fife",
+"west lothian",
+"musselburgh",
+"coatbridge",
+"airdrie",
+"cumbernauld",
+"broxburn",
+"scotland"
+]
+Filtering logic:
+function isScotlandJob(location){
+location=location.toLowerCase()
+return location.includes("scotland")
+||
+scotlandLocations.some(
+city=>location.includes(city)
+)
+}
+Pipeline:
+Amazon Jobs
+↓
+Scraper
+↓
+
+Extract Location
+↓
+Scotland Filter
+↓
+Deduplication
+↓
+Database
+↓
+Telegram Notification
+
+FR-4 Filtering System
+Allow filtering by:
+
+Job title keywords
+Examples:
+Warehouse
+Kitchen Porter
+Software Tester
+Barista
+Chef
+
+Location
+Examples:
+Edinburgh
+Bathgate
+Dunfermline
+Livingston
+
+Salary
+Example:
+Minimum £13/hr
+
+Work type
+Options:
+●​ Full-time
+●​ Part-time
+●​ Internship
+●​ Seasonal
+●​ Contract
+
+FR-5 Deduplication
+Prevent:
+●​ Duplicate notifications
+●​ Duplicate processing
+●​ Repeated jobs
+Logic:
+if(jobID exists){
+ignore()
+}else{
+save()
+notify()
+}
+
+FR-6 Telegram Notification System
+Requirements:
+●​ Use Telegram Bot API
+●​ Never scrape Telegram
+●​ BOT_TOKEN stored in environment variables
+●​ Send alerts to personal DM
+
+Notification example:
+
+🚨 New Scotland Job Found
+📍 Bathgate, Scotland
+📦 Warehouse Operative
+💼 Seasonal | Part-time
+💷 £14.30/hr
+🕐 16 hrs/week
+Apply:
+https://job-link
+
+7. Architecture
+Amazon Jobs Website
+Indeed
+LinkedIn
+Career Pages
+↓
++----------------------+
+| Monitoring Service |
++----------------------+
+↓
++----------------------+
+| Extraction Engine
++----------------------+
+↓
+
+|
+
++----------------------+
+| Scotland Filter
+
+|
+
++----------------------+
+↓
++----------------------+
+| Filter Engine
+
+|
+
++----------------------+
+↓
++----------------------+
+| Deduplication Logic |
++----------------------+
+↓
++----------------------+
+| Database
+
+|
+
++----------------------+
+↓
++----------------------+
+| Telegram Service
+
+|
+
++----------------------+
+↓
+Telegram Notification
+
+8. Folder Structure
+scotjob-pulse/
+├── src/
+
+│
+├── config/
+│ ├── telegram.js
+│ ├── database.js
+│
+├── scrapers/
+│ ├── amazonScraper.js
+│ ├── indeedScraper.js
+│ ├── linkedInScraper.js
+│
+├── services/
+│ ├── monitorService.js
+│ ├── filterService.js
+│ ├── dedupeService.js
+│ ├── notificationService.js
+│
+├── database/
+│ ├── schema.prisma
+│
+├── routes/
+│ ├── jobs.js
+│
+├── utils/
+│ ├── logger.js
+│
+├── .env
+├── package.json
+└── server.js
+
+9. Database Schema
+Jobs Table
+Field
+
+Type
+
+id
+
+UUID
+
+sourceJobI
+D
+
+String
+
+title
+
+String
+
+location
+
+String
+
+salary
+
+String
+
+workType
+
+String
+
+source
+
+String
+
+link
+
+String
+
+detectedAt
+
+Timestamp
+
+Users Table
+Field
+
+Type
+
+id
+
+UUID
+
+telegramID
+
+String
+
+keywords
+
+String
+
+preferredLocation
+
+String
+
+minSalary
+
+Number
+
+10. Suggested Tech Stack
+Backend:
+●​ Node.js
+
+●​ Express
+Libraries:
+axios
+cheerio
+playwright
+node-cron
+dotenv
+node-telegram-bot-api
+prisma
+Database:
+Development:
+SQLite
+Production:
+PostgreSQL
+Caching:
+Redis
+Deployment:
+Render​
+Railway​
+Docker
+
+11. MVP Scope
+Included:
+
+✅
+Amazon monitoring​
+✅
+Scotland-only filtering​
+✅
+Telegram alerts​
+✅
+Deduplication​
+✅
+storage​
+✅ Database
+Keyword filtering
+Excluded:
+❌
+❌ Dashboard​
+AI scoring​
+
+❌
+apply​
+❌ Auto
+Browser extension
+12. Estimated Timeline
+Phase
+
+Estimat
+e
+
+Telegram setup
+
+1 day
+
+Scraper engine
+
+2 days
+
+Scotland filter
+
+1 day
+
+Database
+integration
+
+1 day
+
+Notifications
+
+1 day
+
+Testing
+
+2 days
+
+Deployment
+
+1 day
+
+Estimated MVP:
+7–10 days
+
+
