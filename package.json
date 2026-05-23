@@ -8,9 +8,9 @@
   "main": "dist/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium && tsc -p tsconfig.json",
+    "build": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium && npm run db:push && tsc -p tsconfig.json",
     "dev": "tsx watch src/server.ts",
-    "start": "PLAYWRIGHT_BROWSERS_PATH=0 npm run db:push && PLAYWRIGHT_BROWSERS_PATH=0 node dist/server.js",
+    "start": "PLAYWRIGHT_BROWSERS_PATH=0 node dist/server.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push"

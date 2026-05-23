@@ -9,6 +9,32 @@ import { logger } from "../utils/logger.js";
 
 let monitorRunning = false;
 
+type CycleClassification = "BLOCKED_CLOUDFRONT" | "EMPTY_GRAPHQL" | "EMPTY_JOB_ARRAY" | "SUCCESS";
+
+function classifyCycle(
+  captureMetrics: ReturnType<typeof getLastCaptureMetrics>,
+  extractionCount: number
+): CycleClassification {
+  const blockedByCloudFront =
+    captureMetrics.cloudFrontBlockExists ||
+    captureMetrics.requestBlockedExists ||
+    captureMetrics.pageTitle === "ERROR: The request could not be satisfied";
+
+  if (blockedByCloudFront) {
+    return "BLOCKED_CLOUDFRONT";
+  }
+
+  if (captureMetrics.graphqlRequestCount === 0 && extractionCount === 0) {
+    return "EMPTY_GRAPHQL";
+  }
+
+  if (captureMetrics.graphqlRequestCount > 0 && extractionCount === 0) {
+    return "EMPTY_JOB_ARRAY";
+  }
+
+  return "SUCCESS";
+}
+
 export interface MonitorCycleSummary {
   cycleTimestamp: string;
   extractionAttempts: number;
@@ -103,10 +129,26 @@ export async function checkAmazonJobs(): Promise<MonitorCycleSummary> {
     });
 
     const captureMetrics = getLastCaptureMetrics();
+    const classification = classifyCycle(captureMetrics, jobs.length);
 
     logger.info(
       {
         cycleTimestamp,
+        classification,
+        cloudFrontBlockExists: captureMetrics.cloudFrontBlockExists,
+        requestBlockedExists: captureMetrics.requestBlockedExists,
+        pageTitle: captureMetrics.pageTitle,
+        graphqlRequestCount: captureMetrics.graphqlRequestCount,
+        graphqlResponseCount: captureMetrics.graphqlResponseCount,
+        extractionCount: jobs.length
+      },
+      "Amazon monitor cycle classification"
+    );
+
+    logger.info(
+      {
+        cycleTimestamp,
+        classification,
         extractionAttempts: captureMetrics.extractionAttempts,
         successfulExtractions: captureMetrics.successfulExtractions,
         failedExtractions: captureMetrics.failedExtractions,

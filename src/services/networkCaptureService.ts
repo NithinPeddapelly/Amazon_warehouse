@@ -11,6 +11,12 @@ export interface CaptureMetrics {
   extractionAttempts: number;
   successfulExtractions: number;
   failedExtractions: number;
+  extractionCount: number;
+  graphqlRequestCount: number;
+  graphqlResponseCount: number;
+  cloudFrontBlockExists: boolean;
+  requestBlockedExists: boolean;
+  pageTitle: string;
 }
 
 interface NetworkCaptureResult {
@@ -28,7 +34,13 @@ interface GraphQLPayload {
 let lastCaptureMetrics: CaptureMetrics = {
   extractionAttempts: 0,
   successfulExtractions: 0,
-  failedExtractions: 0
+  failedExtractions: 0,
+  extractionCount: 0,
+  graphqlRequestCount: 0,
+  graphqlResponseCount: 0,
+  cloudFrontBlockExists: false,
+  requestBlockedExists: false,
+  pageTitle: ""
 };
 
 export function getLastCaptureMetrics(): CaptureMetrics {
@@ -274,6 +286,18 @@ async function simulateLightweightUserBehavior(page: Page): Promise<void> {
 }
 
 export async function captureJobsFromNetwork(): Promise<NetworkCaptureResult> {
+  lastCaptureMetrics = {
+    extractionAttempts: 0,
+    successfulExtractions: 0,
+    failedExtractions: 0,
+    extractionCount: 0,
+    graphqlRequestCount: 0,
+    graphqlResponseCount: 0,
+    cloudFrontBlockExists: false,
+    requestBlockedExists: false,
+    pageTitle: ""
+  };
+
   const browser = await chromium.launch({
     headless: env.scrapeHeadless,
     proxy: parseProxyForPlaywright()
@@ -392,6 +416,40 @@ export async function captureJobsFromNetwork(): Promise<NetworkCaptureResult> {
     const postLoadContent = await page.content();
     const postLoadUrl = page.url();
     const postLoadTitle = await page.title();
+    const browserFingerprint = await page.evaluate(() => {
+      const nav = navigator as Navigator & {
+        deviceMemory?: number;
+        userAgentData?: { brands?: Array<{ brand: string; version: string }>; mobile?: boolean; platform?: string };
+      };
+
+      return {
+        userAgent: nav.userAgent,
+        webdriver: nav.webdriver,
+        language: nav.language,
+        languages: nav.languages,
+        locale: Intl.DateTimeFormat().resolvedOptions().locale,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        platform: nav.platform,
+        hardwareConcurrency: nav.hardwareConcurrency,
+        deviceMemory: nav.deviceMemory ?? null,
+        colorDepth: window.screen.colorDepth,
+        pixelRatio: window.devicePixelRatio,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        },
+        userAgentData: nav.userAgentData
+          ? {
+              brands: nav.userAgentData.brands ?? [],
+              mobile: nav.userAgentData.mobile ?? false,
+              platform: nav.userAgentData.platform ?? null
+            }
+          : null
+      };
+    });
+
+    const cloudFrontBlockExists = postLoadContent.toLowerCase().includes("cloudfront");
+    const requestBlockedExists = postLoadContent.toLowerCase().includes("request blocked");
 
     await saveDiagnosticsSnapshot(page, diagnosticsDir, "render-after-load.png", "render-page.html");
 
@@ -400,10 +458,17 @@ export async function captureJobsFromNetwork(): Promise<NetworkCaptureResult> {
       {
         currentUrl: postLoadUrl,
         pageTitle: postLoadTitle,
+        browserLocale: env.graphqlLocale,
+        contextLocale: browserFingerprint.locale,
+        timezone: browserFingerprint.timezone,
+        userAgent: browserFingerprint.userAgent,
+        navigatorWebdriver: browserFingerprint.webdriver,
+        browserFingerprint,
+        proxyConfigured: Boolean(env.scrapeProxyUrl),
         pageContentLength: postLoadContent.length,
         captchaExists: normalizedContent.includes("captcha") || normalizedContent.includes("recaptcha"),
-        cloudFrontBlockExists: normalizedContent.includes("cloudfront"),
-        requestBlockedExists: normalizedContent.includes("request blocked"),
+        cloudFrontBlockExists,
+        requestBlockedExists,
         jobSearchExists: normalizedContent.includes("jobsearch"),
         warehouseExists: normalizedContent.includes("warehouse")
       },
@@ -421,7 +486,13 @@ export async function captureJobsFromNetwork(): Promise<NetworkCaptureResult> {
     lastCaptureMetrics = {
       extractionAttempts,
       successfulExtractions,
-      failedExtractions
+      failedExtractions,
+      extractionCount: jobs.length,
+      graphqlRequestCount,
+      graphqlResponseCount,
+      cloudFrontBlockExists,
+      requestBlockedExists,
+      pageTitle: postLoadTitle
     };
 
     logger.info(
