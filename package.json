@@ -2,6 +2,9 @@
   "name": "scotjob-pulse-ai",
   "version": "1.0.0",
   "description": "Amazon warehouse Scotland job monitor with Telegram alerts",
+  "engines": {
+    "node": "20.x"
+  },
   "main": "dist/server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
