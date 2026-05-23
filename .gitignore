@@ -9,4 +9,6 @@ temp/
 *.log
 
 prisma/dev.db
-prisma/dev.db-journal.DS_Store
+prisma/dev.db-journal
+
+.DS_Store
