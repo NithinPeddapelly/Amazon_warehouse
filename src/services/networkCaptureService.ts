@@ -1,4 +1,6 @@
 import { chromium, type BrowserContextOptions, type Page, type Response } from "playwright";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { env } from "../config/env.js";
 import type { JobListing, WorkType } from "../types/job.js";
 import { logger } from "../utils/logger.js";
@@ -240,6 +242,37 @@ function bodySample(text: string): string {
   return text.length > 500 ? `${text.slice(0, 500)}...` : text;
 }
 
+function randomInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+async function saveDiagnosticsSnapshot(page: Page, outputDir: string, screenshotName: string, htmlName?: string): Promise<void> {
+  await mkdir(outputDir, { recursive: true });
+  await page.screenshot({ path: path.join(outputDir, screenshotName), fullPage: true });
+  if (htmlName) {
+    const html = await page.content();
+    await writeFile(path.join(outputDir, htmlName), html, "utf8");
+  }
+}
+
+async function simulateLightweightUserBehavior(page: Page): Promise<void> {
+  const viewport = page.viewportSize() ?? { width: 1280, height: 720 };
+  await page.mouse.move(Math.floor(viewport.width * 0.2), Math.floor(viewport.height * 0.2));
+  await page.waitForTimeout(120);
+  await page.mouse.move(Math.floor(viewport.width * 0.75), Math.floor(viewport.height * 0.55));
+  await page.waitForTimeout(120);
+  await page.mouse.wheel(0, randomInt(200, 600));
+  await page.waitForTimeout(180);
+
+  try {
+    await page.locator("body").first().click({ timeout: 1200 });
+  } catch {
+    // Best-effort body interaction for diagnostics only.
+  }
+
+  await page.waitForTimeout(randomInt(700, 1600));
+}
+
 export async function captureJobsFromNetwork(): Promise<NetworkCaptureResult> {
   const browser = await chromium.launch({
     headless: env.scrapeHeadless,
@@ -249,11 +282,33 @@ export async function captureJobsFromNetwork(): Promise<NetworkCaptureResult> {
   const page = await browser.newPage({ locale: env.graphqlLocale });
   const jobsById = new Map<string, JobListing>();
   const operationsSeen = new Set<string>();
+  const requestUrlsSeen: string[] = [];
+  const responseUrlsSeen: string[] = [];
+  const firstNetworkRequests: string[] = [];
+  let graphqlRequestCount = 0;
+  let graphqlResponseCount = 0;
   let extractionAttempts = 0;
   let successfulExtractions = 0;
   let failedExtractions = 0;
 
+  page.on("request", (request) => {
+    const url = request.url();
+    requestUrlsSeen.push(url);
+    if (firstNetworkRequests.length < 10) {
+      firstNetworkRequests.push(url);
+    }
+    if (url.includes("/graphql")) {
+      graphqlRequestCount += 1;
+    }
+  });
+
   page.on("response", async (response) => {
+    const responseUrl = response.url();
+    responseUrlsSeen.push(responseUrl);
+    if (responseUrl.includes("/graphql")) {
+      graphqlResponseCount += 1;
+    }
+
     if (!response.url().includes("/graphql")) return;
 
     const observedAt = new Date().toISOString();
@@ -333,6 +388,31 @@ export async function captureJobsFromNetwork(): Promise<NetworkCaptureResult> {
       timeout: env.scrapeRenderTimeoutMs
     });
 
+    const diagnosticsDir = path.join(process.cwd(), "temp");
+    const postLoadContent = await page.content();
+    const postLoadUrl = page.url();
+    const postLoadTitle = await page.title();
+
+    await saveDiagnosticsSnapshot(page, diagnosticsDir, "render-after-load.png", "render-page.html");
+
+    const normalizedContent = postLoadContent.toLowerCase();
+    logger.info(
+      {
+        currentUrl: postLoadUrl,
+        pageTitle: postLoadTitle,
+        pageContentLength: postLoadContent.length,
+        captchaExists: normalizedContent.includes("captcha") || normalizedContent.includes("recaptcha"),
+        cloudFrontBlockExists: normalizedContent.includes("cloudfront"),
+        requestBlockedExists: normalizedContent.includes("request blocked"),
+        jobSearchExists: normalizedContent.includes("jobsearch"),
+        warehouseExists: normalizedContent.includes("warehouse")
+      },
+      "Playwright page diagnostics after load"
+    );
+
+    await simulateLightweightUserBehavior(page);
+    await saveDiagnosticsSnapshot(page, diagnosticsDir, "render-after-wait.png");
+
     await nudgeUiForTraffic(page);
     await visitSomeJobDetails(page, Array.from(jobsById.keys()));
 
@@ -346,6 +426,11 @@ export async function captureJobsFromNetwork(): Promise<NetworkCaptureResult> {
 
     logger.info(
       {
+        requestUrlsSeen,
+        responseUrlsSeen,
+        graphqlRequestCount,
+        graphqlResponseCount,
+        first10NetworkRequests: firstNetworkRequests,
         operationsSeen: Array.from(operationsSeen),
         extractionCount: jobs.length,
         extractionAttempts,

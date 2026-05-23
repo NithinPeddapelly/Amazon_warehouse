@@ -7,6 +7,8 @@ import { getLastCaptureMetrics } from "./networkCaptureService.js";
 import { notifyJobs } from "./notificationService.js";
 import { logger } from "../utils/logger.js";
 
+let monitorRunning = false;
+
 export interface MonitorCycleSummary {
   cycleTimestamp: string;
   extractionAttempts: number;
@@ -22,6 +24,24 @@ export interface MonitorCycleSummary {
 export async function checkAmazonJobs(): Promise<MonitorCycleSummary> {
   const startedAt = new Date();
   const cycleTimestamp = startedAt.toISOString();
+
+  if (monitorRunning) {
+    logger.warn("Monitor already running. Skipping.");
+    const captureMetrics = getLastCaptureMetrics();
+    return {
+      cycleTimestamp,
+      extractionAttempts: captureMetrics.extractionAttempts,
+      successfulExtractions: captureMetrics.successfulExtractions,
+      failedExtractions: captureMetrics.failedExtractions,
+      duplicateCount: 0,
+      filteredCount: 0,
+      telegramSentCount: 0,
+      extractionCount: 0,
+      crashed: false
+    };
+  }
+
+  monitorRunning = true;
 
   try {
     logger.info("Amazon fetch started");
@@ -111,18 +131,22 @@ export async function checkAmazonJobs(): Promise<MonitorCycleSummary> {
       crashed: false
     };
   } catch (error) {
-    await prisma.jobLog.create({
-      data: {
-        source: "amazon",
-        fetchedCount: 0,
-        filteredCount: 0,
-        newCount: 0,
-        duplicateCount: 0,
-        sentToTelegram: false,
-        status: "cycle_error",
-        errorMessage: error instanceof Error ? error.message : String(error)
-      }
-    });
+    try {
+      await prisma.jobLog.create({
+        data: {
+          source: "amazon",
+          fetchedCount: 0,
+          filteredCount: 0,
+          newCount: 0,
+          duplicateCount: 0,
+          sentToTelegram: false,
+          status: "cycle_error",
+          errorMessage: error instanceof Error ? error.message : String(error)
+        }
+      });
+    } catch (loggingError) {
+      logger.error({ loggingError }, "Failed to write cycle_error log entry");
+    }
 
     logger.error({ error }, "Amazon monitor cycle failed");
 
@@ -138,6 +162,7 @@ export async function checkAmazonJobs(): Promise<MonitorCycleSummary> {
       crashed: true
     };
   } finally {
+    monitorRunning = false;
     const durationMs = Date.now() - startedAt.getTime();
     logger.info({ durationMs }, "Amazon monitor cycle duration");
   }

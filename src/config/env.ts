@@ -10,6 +10,22 @@ for (const key of requiredAtStartup) {
   }
 }
 
+function parseScrapeIntervalMinutes(rawValue: string): number {
+  const trimmed = rawValue.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    throw new Error("Invalid SCRAPE_INTERVAL: must be a finite integer between 1 and 1440 minutes");
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 1 || parsed > 1440) {
+    throw new Error("Invalid SCRAPE_INTERVAL: must be a finite integer between 1 and 1440 minutes");
+  }
+
+  return parsed;
+}
+
+const scrapeIntervalMinutes = parseScrapeIntervalMinutes(process.env.SCRAPE_INTERVAL ?? "");
+
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number(process.env.PORT ?? 4000),
@@ -17,7 +33,7 @@ export const env = {
     process.env.SCRAPE_HEADLESS !== undefined
       ? process.env.SCRAPE_HEADLESS.toLowerCase() !== "false"
       : (process.env.NODE_ENV ?? "development") === "production",
-  scrapeIntervalSeconds: Number(process.env.SCRAPE_INTERVAL ?? 10),
+  scrapeIntervalMinutes,
   scrapeRequestTimeoutMs: Number(process.env.SCRAPE_TIMEOUT_MS ?? 20000),
   scrapeMaxRetries: Number(process.env.SCRAPE_MAX_RETRIES ?? 2),
   scrapeRenderTimeoutMs: Number(process.env.SCRAPE_RENDER_TIMEOUT_MS ?? 30000),
