@@ -242,7 +242,7 @@ function bodySample(text: string): string {
 
 export async function captureJobsFromNetwork(): Promise<NetworkCaptureResult> {
   const browser = await chromium.launch({
-    headless: false,
+    headless: env.scrapeHeadless,
     proxy: parseProxyForPlaywright()
   });
 

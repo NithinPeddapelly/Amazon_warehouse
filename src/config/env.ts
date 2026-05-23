@@ -13,6 +13,10 @@ for (const key of requiredAtStartup) {
 export const env = {
   nodeEnv: process.env.NODE_ENV ?? "development",
   port: Number(process.env.PORT ?? 4000),
+  scrapeHeadless:
+    process.env.SCRAPE_HEADLESS !== undefined
+      ? process.env.SCRAPE_HEADLESS.toLowerCase() !== "false"
+      : (process.env.NODE_ENV ?? "development") === "production",
   scrapeIntervalSeconds: Number(process.env.SCRAPE_INTERVAL ?? 10),
   scrapeRequestTimeoutMs: Number(process.env.SCRAPE_TIMEOUT_MS ?? 20000),
   scrapeMaxRetries: Number(process.env.SCRAPE_MAX_RETRIES ?? 2),

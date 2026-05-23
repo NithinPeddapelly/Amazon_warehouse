@@ -69,7 +69,7 @@ function parseProxyForPlaywright(): { server: string; username?: string; passwor
 
 async function fetchFallbackHtmlWithPlaywright(): Promise<string> {
   const browser = await chromium.launch({
-    headless: false,
+    headless: env.scrapeHeadless,
     proxy: parseProxyForPlaywright()
   });
 
